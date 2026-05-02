@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>ShaderNN — spiking reservoir for live MNIST</title>
+  <style>
+    html, body {
+      margin: 0;
+      background: #0b0b10;
+      color: #d8d8e0;
+      font: 13px/1.4 ui-monospace, "JetBrains Mono", Menlo, monospace;
+      height: 100%;
+      overflow: hidden;
+    }
+    #stage {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      align-items: center;
+      justify-content: center;
+      gap: 28px;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+    .panel {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .panel h2 {
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #6a6a78;
+      margin: 0;
+    }
+    canvas {
+      display: block;
+      background: #000;
+      box-shadow: 0 0 0 1px #2a2a35;
+    }
+    #brain {
+      image-rendering: pixelated;
+      width: 512px;
+      height: 512px;
+    }
+    #draw {
+      width: 280px;
+      height: 280px;
+      cursor: crosshair;
+    }
+    #bars {
+      width: 280px;
+      height: 200px;
+      background: #0e0e14;
+    }
+    #curve {
+      width: 512px;
+      height: 100px;
+      background: #0e0e14;
+    }
+    #hud { width: 280px; color: #cfcfd8; }
+    #hud .row { display: flex; justify-content: space-between; padding: 2px 0; }
+    #hud .row span:last-child { color: #9bd3ff; }
+    #hud .buttons { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+    #hud button {
+      background: #1a1a22;
+      border: 1px solid #2a2a35;
+      color: #cfcfd8;
+      font: inherit;
+      padding: 4px 10px;
+      cursor: pointer;
+      border-radius: 3px;
+    }
+    #hud button:hover { background: #25252f; }
+    #hud .help { margin-top: 14px; color: #6a6a78; font-size: 11px; }
+    #hud kbd {
+      background: #1a1a22; border: 1px solid #2a2a35; border-radius: 3px;
+      padding: 0 5px; color: #cfcfd8;
+    }
+    #hud .note {
+      margin-top: 10px;
+      font-size: 10px;
+      color: #3a3a48;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <div class="panel">
+      <h2>Draw a digit (0–9)</h2>
+      <canvas id="draw" width="280" height="280"></canvas>
+      <h2>Prediction</h2>
+      <canvas id="bars" width="280" height="200"></canvas>
+      <div id="hud">
+        <div class="row"><span>examples seen</span><span id="hud-step">0</span></div>
+        <div class="row"><span>train acc (EMA)</span><span id="hud-train">10%</span></div>
+        <div class="row"><span>val acc</span><span id="hud-val">—</span></div>
+        <div class="row"><span>population rate</span><span id="hud-pop">0%</span></div>
+        <div class="buttons">
+          <button id="btn-save">save weights (PNG)</button>
+          <button id="btn-load">load weights (PNG)</button>
+        </div>
+        <input id="file-load" type="file" accept="image/png" style="display:none" />
+        <div class="help">
+          <p><kbd>space</kbd> pause / resume training</p>
+          <p><kbd>C</kbd> clear the drawing</p>
+          <p><kbd>R</kbd> reset reservoir + readout</p>
+          <p><kbd>L</kbd> freeze readout</p>
+          <p><kbd>W</kbd> cycle view: voltage → trace → input drive</p>
+        </div>
+        <div class="note">
+          Fixed random spiking reservoir (16,384 LIF neurons). Only the linear
+          readout is trained, online with softmax SGD. The brain visualization
+          shows reservoir activity as the network classifies. Draw to see live
+          inference; training continues in the background.
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Reservoir — 16,384 spiking neurons</h2>
+      <canvas id="brain" width="512" height="512"></canvas>
+      <h2>Validation accuracy ↑</h2>
+      <canvas id="curve" width="512" height="100"></canvas>
+    </div>
+  </div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

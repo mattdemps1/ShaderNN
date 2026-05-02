@@ -1,0 +1,9 @@
+# MNIST blob is a build artifact — regenerate with `python3 build_mnist.py`
+data/mnist_subset.bin
+
+# Editor / OS
+.DS_Store
+*.swp
+.vscode/
+.idea/
+__pycache__/
