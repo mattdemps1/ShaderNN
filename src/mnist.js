@@ -48,13 +48,15 @@ export async function loadMNIST(url = "./data/mnist_subset.bin") {
   // Shuffled train iterator that loops forever
   let order = shuffledIndices(numTrain);
   let cursor = 0;
+  let useAugment = true;
   function nextTrain() {
     if (cursor >= order.length) {
       order = shuffledIndices(numTrain);
       cursor = 0;
     }
     const i = order[cursor++];
-    return { image: augment(getImage(trainF, i)), label: trainLabels[i], index: i };
+    const raw = getImage(trainF, i);
+    return { image: useAugment ? augment(raw) : raw, label: trainLabels[i], index: i };
   }
 
   function getTest(idx) {
@@ -64,6 +66,7 @@ export async function loadMNIST(url = "./data/mnist_subset.bin") {
   return {
     numTrain, numTest,
     nextTrain, getTest,
+    setAugment(on) { useAugment = !!on; },
     trainImages: trainF, trainLabels,
     testImages:  testF,  testLabels,
   };

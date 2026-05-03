@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>ShaderNN — spiking reservoir for live MNIST</title>
   <style>
     html, body {
@@ -16,19 +19,21 @@
       display: flex;
       width: 100%;
       height: 100%;
-      align-items: center;
+      align-items: stretch;
       justify-content: center;
-      gap: 28px;
-      padding: 24px;
+      gap: 20px;
+      padding: 20px;
       box-sizing: border-box;
+      overflow: auto;
     }
-    .panel {
+    .col {
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 12px;
+      min-width: 0;
     }
-    .panel h2 {
-      font-size: 11px;
+    .col h2 {
+      font-size: 10px;
       letter-spacing: 0.2em;
       text-transform: uppercase;
       color: #6a6a78;
@@ -41,91 +46,227 @@
     }
     #brain {
       image-rendering: pixelated;
-      width: 512px;
-      height: 512px;
+      width: 480px;
+      height: 480px;
     }
     #draw {
       width: 280px;
       height: 280px;
       cursor: crosshair;
     }
-    #bars {
-      width: 280px;
-      height: 200px;
+    #bars    { width: 200px; height: 200px; background: #0e0e14; }
+    #preview { width: 72px; height: 72px; }
+    #curve  { width: 480px; height: 100px; background: #0e0e14; }
+    #losscurve { width: 480px; height: 80px; background: #0e0e14; }
+    #poprate   { width: 480px; height: 60px; background: #0e0e14; }
+
+    .panel {
       background: #0e0e14;
+      border: 1px solid #1f1f2a;
+      border-radius: 4px;
+      padding: 10px 12px;
     }
-    #curve {
-      width: 512px;
-      height: 100px;
-      background: #0e0e14;
+    .panel h3 {
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #6a6a78;
+      margin: 0 0 6px 0;
     }
-    #hud { width: 280px; color: #cfcfd8; }
-    #hud .row { display: flex; justify-content: space-between; padding: 2px 0; }
-    #hud .row span:last-child { color: #9bd3ff; }
-    #hud .buttons { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
-    #hud button {
+    .row { display: flex; justify-content: space-between; padding: 1px 0; gap: 10px; }
+    .row span:last-child { color: #9bd3ff; font-variant-numeric: tabular-nums; }
+
+    .ctrl {
+      display: grid;
+      grid-template-columns: 110px 1fr 50px;
+      align-items: center;
+      gap: 8px;
+      padding: 3px 0;
+    }
+    .ctrl label { color: #8a8a98; font-size: 11px; }
+    .ctrl input[type=range] { width: 100%; accent-color: #9bd3ff; }
+    .ctrl .val { color: #9bd3ff; font-variant-numeric: tabular-nums; text-align: right; font-size: 11px; }
+
+    .toggles { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    .toggles label {
+      background: #1a1a22; border: 1px solid #2a2a35;
+      padding: 3px 8px; border-radius: 3px; cursor: pointer; font-size: 11px;
+    }
+    .toggles input { vertical-align: middle; margin-right: 4px; }
+
+    .buttons { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+    button {
       background: #1a1a22;
       border: 1px solid #2a2a35;
       color: #cfcfd8;
-      font: inherit;
-      padding: 4px 10px;
+      font: inherit; font-size: 11px;
+      padding: 4px 9px;
       cursor: pointer;
       border-radius: 3px;
     }
-    #hud button:hover { background: #25252f; }
-    #hud .help { margin-top: 14px; color: #6a6a78; font-size: 11px; }
-    #hud kbd {
+    button:hover { background: #25252f; }
+    button.warn { color: #ffb39b; }
+
+    .help { color: #6a6a78; font-size: 11px; margin-top: 4px; }
+    .help kbd {
       background: #1a1a22; border: 1px solid #2a2a35; border-radius: 3px;
       padding: 0 5px; color: #cfcfd8;
     }
-    #hud .note {
-      margin-top: 10px;
+    .note {
       font-size: 10px;
       color: #3a3a48;
       line-height: 1.6;
     }
+    .lcol { width: 280px; }
+    .ccol { width: 480px; }
+    .rcol { width: 280px; }
   </style>
 </head>
 <body>
   <div id="stage">
-    <div class="panel">
+    <!-- Left column: drawing + prediction + main HUD -->
+    <div class="col lcol">
       <h2>Draw a digit (0–9)</h2>
       <canvas id="draw" width="280" height="280"></canvas>
+
       <h2>Prediction</h2>
-      <canvas id="bars" width="280" height="200"></canvas>
-      <div id="hud">
+      <div style="display:flex; gap:8px; align-items:flex-start;">
+        <canvas id="bars" width="200" height="200"></canvas>
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <span style="font-size:9px; color:#6a6a78; letter-spacing:0.18em;">SEEN BY NET</span>
+          <canvas id="preview" width="72" height="72" style="image-rendering:pixelated; background:#000;"></canvas>
+          <span id="preview-label" style="font-size:10px; color:#5a5a68; text-align:center;">—</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Training</h3>
         <div class="row"><span>examples seen</span><span id="hud-step">0</span></div>
-        <div class="row"><span>train acc (EMA)</span><span id="hud-train">10%</span></div>
+        <div class="row"><span>train acc EMA</span><span id="hud-train">10%</span></div>
         <div class="row"><span>val acc</span><span id="hud-val">—</span></div>
-        <div class="row"><span>population rate</span><span id="hud-pop">0%</span></div>
+        <div class="row"><span>val best</span><span id="hud-best">—</span></div>
+        <div class="row"><span>loss EMA</span><span id="hud-loss">—</span></div>
+        <div class="row"><span>throughput</span><span id="hud-tput">— ex/s</span></div>
         <div class="buttons">
-          <button id="btn-save">save weights (PNG)</button>
-          <button id="btn-load">load weights (PNG)</button>
+          <button id="btn-save">save (.bin)</button>
+          <button id="btn-load">load (.bin)</button>
+          <button id="btn-reset" class="warn">reset readout</button>
         </div>
-        <input id="file-load" type="file" accept="image/png" style="display:none" />
+        <input id="file-load" type="file" accept=".bin,application/octet-stream" style="display:none" />
+      </div>
+
+      <div class="panel">
+        <h3>Help</h3>
         <div class="help">
-          <p><kbd>space</kbd> pause / resume training</p>
-          <p><kbd>C</kbd> clear the drawing</p>
-          <p><kbd>R</kbd> reset reservoir + readout</p>
-          <p><kbd>L</kbd> freeze readout</p>
-          <p><kbd>W</kbd> cycle view: voltage → trace → input drive</p>
-        </div>
-        <div class="note">
-          Fixed random spiking reservoir (16,384 LIF neurons). Only the linear
-          readout is trained, online with softmax SGD. The brain visualization
-          shows reservoir activity as the network classifies. Draw to see live
-          inference; training continues in the background.
+          <kbd>space</kbd> pause / resume training<br>
+          <kbd>C</kbd> clear drawing &nbsp; <kbd>R</kbd> reset all<br>
+          <kbd>L</kbd> freeze readout &nbsp; <kbd>W</kbd> cycle view
         </div>
       </div>
     </div>
 
-    <div class="panel">
+    <!-- Center column: brain + curves -->
+    <div class="col ccol">
       <h2>Reservoir — 16,384 spiking neurons</h2>
       <canvas id="brain" width="512" height="512"></canvas>
+
       <h2>Validation accuracy ↑</h2>
-      <canvas id="curve" width="512" height="100"></canvas>
+      <canvas id="curve" width="480" height="100"></canvas>
+
+      <h2>Cross-entropy loss ↓</h2>
+      <canvas id="losscurve" width="480" height="80"></canvas>
+
+      <h2>Population firing rate</h2>
+      <canvas id="poprate" width="480" height="60"></canvas>
+    </div>
+
+    <!-- Right column: diagnostics + controls -->
+    <div class="col rcol">
+      <div class="panel">
+        <h3>Reservoir diagnostics</h3>
+        <div class="row"><span>pop. firing rate</span><span id="hud-pop">—</span></div>
+        <div class="row"><span>active neurons</span><span id="hud-active">—</span></div>
+        <div class="row"><span>trace mean</span><span id="hud-tmean">—</span></div>
+        <div class="row"><span>trace std</span><span id="hud-tstd">—</span></div>
+        <div class="row"><span>pixel mean</span><span id="hud-pmean">—</span></div>
+      </div>
+
+      <div class="panel">
+        <h3>Readout diagnostics</h3>
+        <div class="row"><span>top-1 conf EMA</span><span id="hud-conf">—</span></div>
+        <div class="row"><span>hidden active rate</span><span id="hud-hact">—</span></div>
+        <div class="row"><span>readout dim</span><span id="hud-dim">—</span></div>
+      </div>
+
+      <div class="panel">
+        <h3>Reservoir controls</h3>
+        <div class="ctrl">
+          <label>vThr</label>
+          <input id="c-vthr" type="range" min="0.2" max="1.2" step="0.01" />
+          <span class="val" id="v-vthr">—</span>
+        </div>
+        <div class="ctrl">
+          <label>drive scale</label>
+          <input id="c-drive" type="range" min="0.5" max="4.0" step="0.05" />
+          <span class="val" id="v-drive">—</span>
+        </div>
+        <div class="ctrl">
+          <label>trace decay</label>
+          <input id="c-tdecay" type="range" min="0.5" max="0.99" step="0.005" />
+          <span class="val" id="v-tdecay">—</span>
+        </div>
+        <div class="ctrl">
+          <label>noise rate</label>
+          <input id="c-noise" type="range" min="0" max="0.02" step="0.0005" />
+          <span class="val" id="v-noise">—</span>
+        </div>
+        <div class="ctrl">
+          <label>v noise</label>
+          <input id="c-vnoise" type="range" min="0" max="0.10" step="0.005" />
+          <span class="val" id="v-vnoise">—</span>
+        </div>
+        <div class="toggles">
+          <label title="zeroes background drizzle and voltage noise — neurons stay quiescent unless driven by input"><input id="c-silent" type="checkbox" />silent (fire only on input)</label>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Training controls</h3>
+        <div class="ctrl">
+          <label>learning rate</label>
+          <input id="c-lr" type="range" min="0.0001" max="0.01" step="0.0001" />
+          <span class="val" id="v-lr">—</span>
+        </div>
+        <div class="ctrl">
+          <label>pixel scale</label>
+          <input id="c-pxs" type="range" min="0" max="2.0" step="0.05" />
+          <span class="val" id="v-pxs">—</span>
+        </div>
+        <div class="ctrl">
+          <label>batch / frame</label>
+          <input id="c-bpf" type="range" min="1" max="10" step="1" />
+          <span class="val" id="v-bpf">—</span>
+        </div>
+        <div class="toggles">
+          <label><input id="c-aug" type="checkbox" checked />augment</label>
+          <label><input id="c-pause" type="checkbox" />pause</label>
+          <label><input id="c-freeze" type="checkbox" />freeze readout</label>
+        </div>
+        <div class="buttons">
+          <button id="btn-recal">re-roll reservoir</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="note">
+          Spiking reservoir (LIF, GPU) feeds a 1-hidden-layer MLP readout
+          trained online with Adam. Augmentation includes elastic
+          deformation. Hover sliders to see ranges; values apply live.
+        </div>
+      </div>
     </div>
   </div>
-  <script type="module" src="./src/main.js"></script>
+  <!-- ?v cache-bust on main.js so you always get the latest after edits -->
+  <script type="module" src="./src/main.js?v=6"></script>
 </body>
 </html>
