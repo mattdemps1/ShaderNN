@@ -2,271 +2,252 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
-  <meta http-equiv="Pragma" content="no-cache" />
-  <meta http-equiv="Expires" content="0" />
-  <title>ShaderNN — spiking reservoir for live MNIST</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ShaderNN — Neural Cellular Automata</title>
   <style>
-    html, body {
-      margin: 0;
-      background: #0b0b10;
-      color: #d8d8e0;
-      font: 13px/1.4 ui-monospace, "JetBrains Mono", Menlo, monospace;
-      height: 100%;
-      overflow: hidden;
-    }
-    #stage {
-      display: flex;
-      width: 100%;
-      height: 100%;
-      align-items: stretch;
-      justify-content: center;
-      gap: 20px;
-      padding: 20px;
-      box-sizing: border-box;
-      overflow: auto;
-    }
-    .col {
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a0a0d;
+      color: #c8ccd4;
+      font-family: "Fira Mono", "Cascadia Code", "Consolas", monospace;
+      font-size: 13px;
+      min-height: 100vh;
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      min-width: 0;
+      align-items: center;
     }
-    .col h2 {
-      font-size: 10px;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: #6a6a78;
-      margin: 0;
+
+    header {
+      width: 100%;
+      padding: 12px 24px;
+      border-bottom: 1px solid #1e2030;
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
     }
-    canvas {
-      display: block;
-      background: #000;
-      box-shadow: 0 0 0 1px #2a2a35;
+    header h1 { font-size: 15px; color: #9bd3ff; letter-spacing: 0.05em; }
+    header .sub { font-size: 11px; color: #5a6070; }
+
+    .layout {
+      display: flex;
+      gap: 20px;
+      padding: 20px;
+      align-items: flex-start;
+      width: 100%;
+      max-width: 980px;
     }
-    #brain {
-      image-rendering: pixelated;
-      width: 480px;
-      height: 480px;
-    }
-    #draw {
-      width: 280px;
-      height: 280px;
-      cursor: crosshair;
-    }
-    #bars    { width: 200px; height: 200px; background: #0e0e14; }
-    #preview { width: 72px; height: 72px; }
-    #curve  { width: 480px; height: 100px; background: #0e0e14; }
-    #losscurve { width: 480px; height: 80px; background: #0e0e14; }
-    #poprate   { width: 480px; height: 60px; background: #0e0e14; }
+
+    /* ── LEFT SIDEBAR ─────────────────────────────────────────────────── */
+    .sidebar { width: 190px; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px; }
 
     .panel {
-      background: #0e0e14;
-      border: 1px solid #1f1f2a;
-      border-radius: 4px;
-      padding: 10px 12px;
+      background: #11131a;
+      border: 1px solid #1e2030;
+      border-radius: 6px;
+      padding: 12px;
     }
-    .panel h3 {
+    .panel-title {
       font-size: 10px;
-      letter-spacing: 0.18em;
       text-transform: uppercase;
-      color: #6a6a78;
-      margin: 0 0 6px 0;
+      letter-spacing: 0.12em;
+      color: #5a6070;
+      margin-bottom: 10px;
     }
-    .row { display: flex; justify-content: space-between; padding: 1px 0; gap: 10px; }
-    .row span:last-child { color: #9bd3ff; font-variant-numeric: tabular-nums; }
 
-    .ctrl {
-      display: grid;
-      grid-template-columns: 110px 1fr 50px;
-      align-items: center;
+    .weight-img-wrap {
+      display: flex;
+      flex-direction: column;
       gap: 8px;
-      padding: 3px 0;
     }
-    .ctrl label { color: #8a8a98; font-size: 11px; }
-    .ctrl input[type=range] { width: 100%; accent-color: #9bd3ff; }
-    .ctrl .val { color: #9bd3ff; font-variant-numeric: tabular-nums; text-align: right; font-size: 11px; }
-
-    .toggles { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
-    .toggles label {
-      background: #1a1a22; border: 1px solid #2a2a35;
-      padding: 3px 8px; border-radius: 3px; cursor: pointer; font-size: 11px;
-    }
-    .toggles input { vertical-align: middle; margin-right: 4px; }
-
-    .buttons { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
-    button {
-      background: #1a1a22;
-      border: 1px solid #2a2a35;
-      color: #cfcfd8;
-      font: inherit; font-size: 11px;
-      padding: 4px 9px;
-      cursor: pointer;
+    .weight-img-wrap label { font-size: 10px; color: #5a6070; }
+    .weight-img-wrap img {
+      image-rendering: pixelated;
+      border: 1px solid #2a2d3a;
       border-radius: 3px;
+      background: #060608;
     }
-    button:hover { background: #25252f; }
-    button.warn { color: #ffb39b; }
+    #img-fc1 { width: 144px; height: 96px;  } /* 48×96 → 3× */
+    #img-fc2 { width: 144px; height: 24px;  } /* 96×16 → 1.5× width, 1.5× height */
 
-    .help { color: #6a6a78; font-size: 11px; margin-top: 4px; }
-    .help kbd {
-      background: #1a1a22; border: 1px solid #2a2a35; border-radius: 3px;
-      padding: 0 5px; color: #cfcfd8;
+    .stat-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+    .stat-label { color: #5a6070; }
+    .stat-val   { color: #9bd3ff; font-variant-numeric: tabular-nums; }
+
+    /* ── CENTER CANVAS ────────────────────────────────────────────────── */
+    .center { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+
+    #ca-canvas {
+      width: 512px;
+      height: 512px;
+      image-rendering: pixelated;
+      border: 1px solid #1e2030;
+      border-radius: 4px;
+      cursor: crosshair;
+      display: block;
     }
-    .note {
-      font-size: 10px;
-      color: #3a3a48;
-      line-height: 1.6;
+
+    .hint {
+      font-size: 11px;
+      color: #3a4050;
+      text-align: center;
     }
-    .lcol { width: 280px; }
-    .ccol { width: 480px; }
-    .rcol { width: 280px; }
+
+    /* ── RIGHT SIDEBAR ────────────────────────────────────────────────── */
+    .controls { display: flex; flex-direction: column; gap: 8px; }
+
+    label.ctrl-label { font-size: 11px; color: #8090a0; display: block; margin-bottom: 4px; }
+
+    select {
+      background: #0d0f16;
+      color: #c8ccd4;
+      border: 1px solid #2a2d3a;
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-family: inherit;
+      font-size: 12px;
+      width: 100%;
+    }
+
+    .spf-group { display: flex; gap: 6px; }
+    .spf-btn {
+      flex: 1;
+      background: #0d0f16;
+      border: 1px solid #2a2d3a;
+      border-radius: 4px;
+      color: #8090a0;
+      font-family: inherit;
+      font-size: 12px;
+      padding: 4px 0;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .spf-btn.active { background: #1a3050; color: #9bd3ff; border-color: #2a5080; }
+    .spf-btn:hover:not(.active) { background: #151820; }
+
+    .kbd-btn {
+      width: 100%;
+      background: #0d0f16;
+      border: 1px solid #2a2d3a;
+      border-radius: 4px;
+      color: #c8ccd4;
+      font-family: inherit;
+      font-size: 12px;
+      padding: 6px 10px;
+      cursor: pointer;
+      text-align: left;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .kbd-btn:hover { background: #151820; }
+    .kbd-hint { font-size: 10px; color: #3a4050; }
+
+    #status {
+      font-size: 11px;
+      color: #5a6070;
+      padding: 6px 10px;
+      background: #0d0f16;
+      border: 1px solid #1e2030;
+      border-radius: 4px;
+    }
   </style>
 </head>
 <body>
-  <div id="stage">
-    <!-- Left column: drawing + prediction + main HUD -->
-    <div class="col lcol">
-      <h2>Draw a digit (0–9)</h2>
-      <canvas id="draw" width="280" height="280"></canvas>
+  <header>
+    <h1>ShaderNN</h1>
+    <span class="sub">Neural Cellular Automata · weights as PNG · WebGL2</span>
+  </header>
 
-      <h2>Prediction</h2>
-      <div style="display:flex; gap:8px; align-items:flex-start;">
-        <canvas id="bars" width="200" height="200"></canvas>
-        <div style="display:flex; flex-direction:column; gap:4px;">
-          <span style="font-size:9px; color:#6a6a78; letter-spacing:0.18em;">SEEN BY NET</span>
-          <canvas id="preview" width="72" height="72" style="image-rendering:pixelated; background:#000;"></canvas>
-          <span id="preview-label" style="font-size:10px; color:#5a5a68; text-align:center;">—</span>
+  <div class="layout">
+    <!-- LEFT: weight PNGs + stats -->
+    <aside class="sidebar">
+      <div class="panel">
+        <div class="panel-title">Weight PNGs</div>
+        <div class="weight-img-wrap">
+          <label>fc1 (48×96) — perception → hidden</label>
+          <img id="img-fc1" src="data/ca_fc1_heart.png" alt="fc1 weights"
+               onerror="this.style.opacity='0.2'" />
+          <label>fc2 (96×16) — hidden → update</label>
+          <img id="img-fc2" src="data/ca_fc2_heart.png" alt="fc2 weights"
+               onerror="this.style.opacity='0.2'" />
         </div>
       </div>
 
       <div class="panel">
-        <h3>Training</h3>
-        <div class="row"><span>examples seen</span><span id="hud-step">0</span></div>
-        <div class="row"><span>train acc EMA</span><span id="hud-train">10%</span></div>
-        <div class="row"><span>val acc</span><span id="hud-val">—</span></div>
-        <div class="row"><span>val best</span><span id="hud-best">—</span></div>
-        <div class="row"><span>loss EMA</span><span id="hud-loss">—</span></div>
-        <div class="row"><span>throughput</span><span id="hud-tput">— ex/s</span></div>
-        <div class="buttons">
-          <button id="btn-save">save (.bin)</button>
-          <button id="btn-load">load (.bin)</button>
-          <button id="btn-reset" class="warn">reset readout</button>
+        <div class="panel-title">Stats</div>
+        <div class="stat-row">
+          <span class="stat-label">Step</span>
+          <span class="stat-val" id="hud-step">0</span>
         </div>
-        <input id="file-load" type="file" accept=".bin,application/octet-stream" style="display:none" />
+        <div class="stat-row">
+          <span class="stat-label">FPS</span>
+          <span class="stat-val" id="hud-fps">—</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Grid</span>
+          <span class="stat-val">256×256</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Params</span>
+          <span class="stat-val">6,256</span>
+        </div>
       </div>
 
-      <div class="panel">
-        <h3>Help</h3>
-        <div class="help">
-          <kbd>space</kbd> pause / resume training<br>
-          <kbd>C</kbd> clear drawing &nbsp; <kbd>R</kbd> reset all<br>
-          <kbd>L</kbd> freeze readout &nbsp; <kbd>W</kbd> cycle view
-        </div>
-      </div>
+      <div id="status" class="panel">Initialising…</div>
+    </aside>
+
+    <!-- CENTER: CA canvas -->
+    <div class="center">
+      <canvas id="ca-canvas"></canvas>
+      <p class="hint">Click &amp; drag to erase cells &nbsp;·&nbsp; [Space] pause &nbsp;·&nbsp; [R] reset</p>
     </div>
 
-    <!-- Center column: brain + curves -->
-    <div class="col ccol">
-      <h2>Reservoir — 16,384 spiking neurons</h2>
-      <canvas id="brain" width="512" height="512"></canvas>
-
-      <h2>Validation accuracy ↑</h2>
-      <canvas id="curve" width="480" height="100"></canvas>
-
-      <h2>Cross-entropy loss ↓</h2>
-      <canvas id="losscurve" width="480" height="80"></canvas>
-
-      <h2>Population firing rate</h2>
-      <canvas id="poprate" width="480" height="60"></canvas>
-    </div>
-
-    <!-- Right column: diagnostics + controls -->
-    <div class="col rcol">
+    <!-- RIGHT: controls -->
+    <aside class="sidebar">
       <div class="panel">
-        <h3>Reservoir diagnostics</h3>
-        <div class="row"><span>pop. firing rate</span><span id="hud-pop">—</span></div>
-        <div class="row"><span>active neurons</span><span id="hud-active">—</span></div>
-        <div class="row"><span>trace mean</span><span id="hud-tmean">—</span></div>
-        <div class="row"><span>trace std</span><span id="hud-tstd">—</span></div>
-        <div class="row"><span>pixel mean</span><span id="hud-pmean">—</span></div>
-      </div>
+        <div class="panel-title">Controls</div>
+        <div class="controls">
+          <div>
+            <label class="ctrl-label">Target pattern</label>
+            <select id="sel-target">
+              <option value="heart">Heart</option>
+              <option value="smiley">Smiley</option>
+              <option value="lizard">Lizard</option>
+            </select>
+          </div>
 
-      <div class="panel">
-        <h3>Readout diagnostics</h3>
-        <div class="row"><span>top-1 conf EMA</span><span id="hud-conf">—</span></div>
-        <div class="row"><span>hidden active rate</span><span id="hud-hact">—</span></div>
-        <div class="row"><span>readout dim</span><span id="hud-dim">—</span></div>
-      </div>
+          <div>
+            <label class="ctrl-label">Steps / frame</label>
+            <div class="spf-group">
+              <button class="spf-btn" data-spf="1">1</button>
+              <button class="spf-btn" data-spf="2">2</button>
+              <button class="spf-btn" data-spf="4">4</button>
+            </div>
+          </div>
 
-      <div class="panel">
-        <h3>Reservoir controls</h3>
-        <div class="ctrl">
-          <label>vThr</label>
-          <input id="c-vthr" type="range" min="0.2" max="1.2" step="0.01" />
-          <span class="val" id="v-vthr">—</span>
-        </div>
-        <div class="ctrl">
-          <label>drive scale</label>
-          <input id="c-drive" type="range" min="0.5" max="4.0" step="0.05" />
-          <span class="val" id="v-drive">—</span>
-        </div>
-        <div class="ctrl">
-          <label>trace decay</label>
-          <input id="c-tdecay" type="range" min="0.5" max="0.99" step="0.005" />
-          <span class="val" id="v-tdecay">—</span>
-        </div>
-        <div class="ctrl">
-          <label>noise rate</label>
-          <input id="c-noise" type="range" min="0" max="0.02" step="0.0005" />
-          <span class="val" id="v-noise">—</span>
-        </div>
-        <div class="ctrl">
-          <label>v noise</label>
-          <input id="c-vnoise" type="range" min="0" max="0.10" step="0.005" />
-          <span class="val" id="v-vnoise">—</span>
-        </div>
-        <div class="toggles">
-          <label title="zeroes background drizzle and voltage noise — neurons stay quiescent unless driven by input"><input id="c-silent" type="checkbox" />silent (fire only on input)</label>
+          <button class="kbd-btn" onclick="document.dispatchEvent(new KeyboardEvent('keydown',{code:'Space',bubbles:true}))">
+            Pause / Resume <span class="kbd-hint">[Space]</span>
+          </button>
+          <button class="kbd-btn" onclick="document.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyR',bubbles:true}))">
+            Reset <span class="kbd-hint">[R]</span>
+          </button>
         </div>
       </div>
 
       <div class="panel">
-        <h3>Training controls</h3>
-        <div class="ctrl">
-          <label>learning rate</label>
-          <input id="c-lr" type="range" min="0.0001" max="0.01" step="0.0001" />
-          <span class="val" id="v-lr">—</span>
-        </div>
-        <div class="ctrl">
-          <label>pixel scale</label>
-          <input id="c-pxs" type="range" min="0" max="2.0" step="0.05" />
-          <span class="val" id="v-pxs">—</span>
-        </div>
-        <div class="ctrl">
-          <label>batch / frame</label>
-          <input id="c-bpf" type="range" min="1" max="10" step="1" />
-          <span class="val" id="v-bpf">—</span>
-        </div>
-        <div class="toggles">
-          <label><input id="c-aug" type="checkbox" checked />augment</label>
-          <label><input id="c-pause" type="checkbox" />pause</label>
-          <label><input id="c-freeze" type="checkbox" />freeze readout</label>
-        </div>
-        <div class="buttons">
-          <button id="btn-recal">re-roll reservoir</button>
+        <div class="panel-title">About</div>
+        <div style="font-size:11px; color:#5a6070; line-height:1.6;">
+          <p>A 6,256-param MLP defines a local update rule. Each cell reads its 3×3 neighbourhood, runs the network, and updates itself.</p>
+          <br>
+          <p>Weights are quantized to uint8 and stored as <strong style="color:#9bd3ff">PNG images</strong>. The browser dequantizes and loads them into a WebGL2 uniform buffer.</p>
+          <br>
+          <p>Training runs in Python (<code>build_ca.py</code>) offline — no training in browser.</p>
         </div>
       </div>
-
-      <div class="panel">
-        <div class="note">
-          Spiking reservoir (LIF, GPU) feeds a 1-hidden-layer MLP readout
-          trained online with Adam. Augmentation includes elastic
-          deformation. Hover sliders to see ranges; values apply live.
-        </div>
-      </div>
-    </div>
+    </aside>
   </div>
-  <!-- ?v cache-bust on main.js so you always get the latest after edits -->
-  <script type="module" src="./src/main.js?v=6"></script>
+
+  <script type="module" src="src/main.js"></script>
 </body>
 </html>
